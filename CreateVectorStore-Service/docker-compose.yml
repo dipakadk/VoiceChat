@@ -1,0 +1,15 @@
+version: '3.5'
+services:
+    redis_server_rag:
+      image: redis:alpine
+      ports:
+        - "6399:6379"
+      restart: always
+
+    openai_rag:
+      build: .
+      volumes:
+        - "/home/ubuntu/INDIAN_RAG_LLM/CreateVectorStore-Service/:/App"
+      ports:
+        - "8089:8089"
+      restart: always

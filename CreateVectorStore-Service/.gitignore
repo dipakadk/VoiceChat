@@ -1,0 +1,9 @@
+venv
+*pyc
+__pycache__/
+*.log
+.env
+english_bot
+test1.py
+test1.ipynb
+milvus.py
