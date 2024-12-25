@@ -581,7 +581,9 @@ async def make_call():
     loop_twilio = asyncio.new_event_loop()
     asyncio.set_event_loop(loop_twilio)
     # call_number = "+9779844484829"
-    loop_twilio.run_until_complete(log_call_sid(call.sid))
+    # await loop_twilio.run_until_complete(log_call_sid(call.sid))
+    await loop_twilio.run_until_complete(log_call_sid(call.sid))
+
     
     
 
