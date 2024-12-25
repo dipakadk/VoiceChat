@@ -9,6 +9,28 @@ from utils.agent_variables import gdpr_instruction_gated, gdpr_instruction_trans
 from utils.redis_whatsapp import getData
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
+
+
+
+import os
+import json
+import base64
+import asyncio
+import argparse
+import time
+from fastapi import FastAPI, WebSocket
+from fastapi.responses import JSONResponse
+from fastapi.websockets import WebSocketDisconnect
+from twilio.rest import Client
+import websockets
+from dotenv import load_dotenv
+import uvicorn
+from tools.setup_tool import *
+from datetime import datetime
+
+
+
+
 import html2text
 from langchain.schema.output_parser import StrOutputParser
 output_parser = StrOutputParser()
@@ -115,21 +137,7 @@ async def init_tool(request_data):
     # print("\n\n========",request_data.summerize_history.load_memory_variables({}),"=============memory buffer")
     system_prompt = prompt_agent
 
-    
-    print(system_prompt)
-    print()
 
-    print()
-    print()
-    import subprocess
-    print("reached 121 tool init")
-    while True:
-        result = subprocess.run(
-            ["python", "main.py", "--call"], 
-            capture_output=True, 
-            text=True, 
-            check=True
-        )
     
 
     # with get_openai_callback() as cb:

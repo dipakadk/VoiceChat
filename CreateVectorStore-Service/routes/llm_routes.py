@@ -563,7 +563,27 @@ async def generate_compilation(request: Request,background_tasks: BackgroundTask
         else:
                 return {"result":"I'm sorry, I don’t have all the details to fully answer your question right now.",'sender':call_id}
 
+from main import *
 
+@router.get("/make_call")
+async def make_call():
+    """Make an outbound call."""
+    outbound_twiml = (
+        f'<?xml version="1.0" encoding="UTF-8"?>'
+        f'<Response><Connect><Stream url="wss://5b89-111-119-49-191.ngrok-free.app/llm/media-stream" /></Connect></Response>'
+    )
+
+    call = client.calls.create(
+        from_=PHONE_NUMBER_FROM,
+        to="+9779844484829",
+        twiml=outbound_twiml
+    )
+    loop_twilio = asyncio.new_event_loop()
+    asyncio.set_event_loop(loop_twilio)
+    # call_number = "+9779844484829"
+    loop_twilio.run_until_complete(log_call_sid(call.sid))
+    
+    
 
 @router.post("/generate/response/chat/completions")
 async def get_response(request: QueryRequest,background_tasks: BackgroundTasks):
@@ -888,6 +908,113 @@ async def get_response(request: QueryRequest,background_tasks: BackgroundTasks):
         sorrymessage="I'm sorry, I don’t have all the details to fully answer your question right now."
         return {"result":sorrymessage,'sender':sender}
 
+
+
+                
+@router.websocket('/media-stream')
+async def handle_media_stream(websocket: WebSocket):
+    """Handle WebSocket connections between Twilio and OpenAI."""
+    print("Client connected")
+    await websocket.accept()
+
+    async with websockets.connect(
+        'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
+        extra_headers={
+            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "OpenAI-Beta": "realtime=v1"
+        }
+    ) as openai_ws:
+        await initialize_session(openai_ws)
+        stream_sid = None
+
+        async def receive_from_twilio():
+            """Receive audio data from Twilio and send it to the OpenAI Realtime API."""
+            nonlocal stream_sid
+            try:
+                async for message in websocket.iter_text():
+                    data = json.loads(message)
+                    if data['event'] == 'media' and openai_ws.open:
+                        audio_append = {
+                            "type": "input_audio_buffer.append",
+                            "audio": data['media']['payload']
+                        }
+                        await openai_ws.send(json.dumps(audio_append))
+                    elif data['event'] == 'start':
+                        stream_sid = data['start']['streamSid']
+                        print(f"Incoming stream has started {stream_sid}")
+            except WebSocketDisconnect:
+                print("Client disconnected.")
+                if openai_ws.open:
+                    await openai_ws.close()
+
+        async def send_to_twilio():
+            """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
+            nonlocal stream_sid
+            try:
+                async for openai_message in openai_ws:
+                    response = json.loads(openai_message)
+                    print("RESPONSE MESSAGE=======================",response)
+                    if response['type'] in LOG_EVENT_TYPES:
+                        print(f"Received event: {response['type']}", response)
+                    if response['type'] == 'session.updated':
+                        print("Session updated successfully:", response)
+                    if response['type'] == 'response.audio.delta' and response.get('delta'):
+                        try:
+                            audio_payload = base64.b64encode(base64.b64decode(response['delta'])).decode('utf-8')
+                            audio_delta = {
+                                "event": "media",
+                                "streamSid": stream_sid,
+                                "media": {
+                                    "payload": audio_payload
+                                }
+                            }
+                            await websocket.send_json(audio_delta)
+                        except Exception as e:
+                            print(f"Error processing audio data: {e}")
+                    if response['type'] == 'response.function_call_arguments.done':
+                        print()
+                        print("***********************************function is called*******************")
+                        print()
+                        functions = {
+                            'date_booking': checkTime,
+                            'bookTool':booking_user_form_tool ,
+                            'generalInfo':general_info,
+                            'CancelBookTool':CancelBooking,
+                            'RescheduleTourBook':RescheduleBooking,
+
+                        }
+                        try:
+                            function_name = response['name']
+                            print("=====================================>",function_name)
+                            call_id = response['call_id']
+                            arguments = json.loads(response['arguments'])
+                            if function_name in functions.keys():
+                                start_time = time.time()
+                                result = functions[function_name](arguments)
+                                print("Result from function call:", result)
+                                end_time = time.time()
+                                elapsed_time = end_time - start_time
+                                print(f"general_keepme execution time: {elapsed_time:.4f} seconds")
+                                function_response = {
+                                    "type": "conversation.item.create",
+                                    "item": {
+                                        "type": "function_call_output",
+                                        "call_id": call_id,
+                                        "output": result
+                                    }
+                                }
+                                await openai_ws.send(json.dumps(function_response))
+                                await openai_ws.send(json.dumps({"type": "response.create"}))
+                        
+                        except json.JSONDecodeError as e:
+                            print(f"Error in json decode in function_call: {e}::{response}")
+                        except Exception as e:
+                            print(f"Error in function_call.done: {e}")
+                            raise Exception("Close Stream")
+            except Exception as e:
+                print(f"Error in send_to_twilio: {e}")
+        await asyncio.gather(receive_from_twilio(), send_to_twilio())
+    
 
 
 # API endpoint to detaermine top asked questions and intents
