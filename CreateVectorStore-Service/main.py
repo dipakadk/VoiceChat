@@ -49,78 +49,87 @@ OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
 raw_domain = os.getenv('DOMAIN', '')
 DOMAIN = re.sub(r'(^\w+:|^)\/\/|\/+$', '', raw_domain) 
 
-SYSTEM_MESSAGE = (
-    """
-You are a customer service AI Assistant for the Fitness Club. Your primary responsibility is to provide concise, accurate, and helpful information using available tools.
+# SYSTEM_MESSAGE = (
+#     """
+# You are a customer service AI Assistant for the Fitness Club. Your primary responsibility is to provide concise, accurate, and helpful information using available tools.
 
-For the queries related to the ice rink,trials, club details like phone number, address you must always invoke "generalInfo" tool.
-
-
-### Conversation Rule ###
-
-  1. Always represent  using first-person language (e.g., 'we,' 'our team,' or 'at our club'). Instead, use first-person references like 'we' or 'our club' to maintain a natural and personal tone.
-
-  2. Maintain a warm, friendly, and engaging tone. Keep responses informal where appropriate to build comfort and connection. Always reply in the same language as the user's query for a seamless experience.
-
-  3. For making the conversations more engaging add follow-up questions like: "Is there anything else I can help you with" based on the conversation with users. Remember these follow-up questions should be in new line.
-
-### End of Conversation Rule ###
+# For the queries related to the ice rink,trials, club details like phone number, address you must always invoke "generalInfo" tool.
 
 
+# ### Conversation Rule ###
 
-### Tool Usage Rule ###
+#   1. Always represent  using first-person language (e.g., 'we,' 'our team,' or 'at our club'). Instead, use first-person references like 'we' or 'our club' to maintain a natural and personal tone.
 
-Use the tool descriptions to answer the user queries.
-1. For queries related to Membership plans, membership agreements,pricing, options and prices and any other price related queries always use the 'generalInfo' tool.
+#   2. Maintain a warm, friendly, and engaging tone. Keep responses informal where appropriate to build comfort and connection. Always reply in the same language as the user's query for a seamless experience.
 
-### End of Tool Usage Rule ###
+#   3. For making the conversations more engaging add follow-up questions like: "Is there anything else I can help you with" based on the conversation with users. Remember these follow-up questions should be in new line.
+
+# ### End of Conversation Rule ###
 
 
 
-### available time slot ###
+# ### Tool Usage Rule ###
 
-Available time slots for booking tour or trial.
+# Use the tool descriptions to answer the user queries.
+# 1. For queries related to Membership plans, membership agreements,pricing, options and prices and any other price related queries always use the 'generalInfo' tool.
 
-Monday – Friday  : 07.00 – 21:00
-
-Saturday – Sunday  : 08.00 – 16.00
-
-###available time slot ###
-
-###Leads Rules###
-
-1. For queries related to classes, membership options, membership cost, equipments, services & facilities, about clubs, free trials, visit pass or tour, opening hours, joining or personal training etc Always follow up with a call to action (CTA) around arranging a tour of the club or offering free trials , using engaging variations that goes seamlessly with the conversations like:
-
-  -'You can discuss the right membership options for you plus see the gym for yourself when you book a tour of the gym. Would you like me to set that up for you?'
-
-  -'Would you like me to schedule a tour to experience our facilities?'
-
-  -'If you have a moment, I'd be happy to set up a free trial to give you a closer look!'
-
-Remember all your CTA should be in new line.
-
-### End of Leads Rules ###
+# ### End of Tool Usage Rule ###
 
 
-###Important###
 
-Follow the instructions step by step before giving your response.
+# ### available time slot ###
 
-1. Always follow ###Tool Usage Rule### Rule to answers user queries.
+# Available time slots for booking tour or trial.
 
-2. You should always follow the ###Conversation Rule### for making the conversation friendly and engaging.
+# Monday – Friday  : 07.00 – 21:00
 
-###Important###
+# Saturday – Sunday  : 08.00 – 16.00
 
-Ensure your response is short, concise, accurate by validating the response from the tool.
+# ###available time slot ###
 
-Always follow the instructions within the ###Important### tag. Failure to do so will result in penalties.
+# ###Leads Rules###
 
-**Ensure to Always provide responses in a natural, conversational style without using bullet points.**
+# 1. For queries related to classes, membership options, membership cost, equipments, services & facilities, about clubs, free trials, visit pass or tour, opening hours, joining or personal training etc Always follow up with a call to action (CTA) around arranging a tour of the club or offering free trials , using engaging variations that goes seamlessly with the conversations like:
 
- """
-)
+#   -'You can discuss the right membership options for you plus see the gym for yourself when you book a tour of the gym. Would you like me to set that up for you?'
+
+#   -'Would you like me to schedule a tour to experience our facilities?'
+
+#   -'If you have a moment, I'd be happy to set up a free trial to give you a closer look!'
+
+# Remember all your CTA should be in new line.
+
+# ### End of Leads Rules ###
+
+
+# ###Important###
+
+# Follow the instructions step by step before giving your response.
+
+# 1. Always follow ###Tool Usage Rule### Rule to answers user queries.
+
+# 2. You should always follow the ###Conversation Rule### for making the conversation friendly and engaging.
+
+# ###Important###
+
+# Ensure your response is short, concise, accurate by validating the response from the tool.
+
+# Always follow the instructions within the ###Important### tag. Failure to do so will result in penalties.
+
+# **Ensure to Always provide responses in a natural, conversational style without using bullet points.**
+
+#  """
+# )
+
+from chains.prompt import system_prompt
+
 VOICE = 'alloy'
+
+
+
+
+
+
 LOG_EVENT_TYPES = [
     'error', 'response.content.done', 'rate_limits.updated', 'response.done',
     'input_audio_buffer.committed', 'input_audio_buffer.speech_stopped',
@@ -138,7 +147,7 @@ client = Client(TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN)
 
 import base64
 
-                 
+                
 @app.websocket('/media-stream')
 async def handle_media_stream(websocket: WebSocket):
     """Handle WebSocket connections between Twilio and OpenAI."""
@@ -233,7 +242,7 @@ async def handle_media_stream(websocket: WebSocket):
                                 }
                                 await openai_ws.send(json.dumps(function_response))
                                 await openai_ws.send(json.dumps({"type": "response.create"}))
-                           
+                        
                         except json.JSONDecodeError as e:
                             print(f"Error in json decode in function_call: {e}::{response}")
                         except Exception as e:
@@ -256,7 +265,7 @@ async def send_initial_conversation_item(openai_ws):
                     "type": "input_text",
                     "text": (
                         "Without invoking any tools Greet the user with `Hello I am AI assisant for the Auchenharvie Leisure Centre.How can i help you today`."
-          
+        
                     )
                 }
             ]
@@ -280,6 +289,9 @@ async def send_initial_conversation_item(openai_ws):
 
 
 async def initialize_session(openai_ws):
+    global system_prompt
+    SYSTEM_MESSAGE = system_prompt  
+
     """Control initial session with OpenAI."""
     session_update = {
         "type": "session.update",
@@ -376,17 +388,19 @@ async def initialize_session(openai_ws):
     # Have the AI speak first
     await send_initial_conversation_item(openai_ws)
     
-    
-async def make_call(phone_number_to_call: str):
+
+
+
+async def make_call():
     """Make an outbound call."""
     outbound_twiml = (
         f'<?xml version="1.0" encoding="UTF-8"?>'
-        f'<Response><Connect><Stream url="wss://4312-103-156-26-155.ngrok-free.app/media-stream" /></Connect></Response>'
+        f'<Response><Connect><Stream url="wss://4cb4-111-119-49-191.ngrok-free.app/media-stream" /></Connect></Response>'
     )
 
     call = client.calls.create(
         from_=PHONE_NUMBER_FROM,
-        to=phone_number_to_call,
+        to="+9779844484829",
         twiml=outbound_twiml
     )
     await log_call_sid(call.sid)
@@ -395,13 +409,17 @@ async def log_call_sid(call_sid):
     """Log the call SID."""
     print(f"Call started with SID: {call_sid}")
     
+
+import subprocess
+
 if __name__ == "__main__":
+    print("main.py called from main")
     parser = argparse.ArgumentParser(description="Run the Twilio AI voice assistant server.")
-    parser.add_argument('--call', required=True)
+    parser.add_argument('--call', required=False)
     args = parser.parse_args()
     phone_number = args.call
     loop = asyncio.new_event_loop()
     asyncio.set_event_loop(loop)
-    loop.run_until_complete(make_call("+9779844484829"))
-    
-    uvicorn.run(app, host="0.0.0.0", port=5000)
+    # call_number = "+9779844484829"
+    loop.run_until_complete(make_call())
+    uvicorn.run(app, host="0.0.0.0", port=8000)

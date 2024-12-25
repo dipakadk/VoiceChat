@@ -704,3 +704,5 @@ async def createInitialWhatsappMessage(
         return {"success": True, "detail": "Succesfully updated"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e)) 
+
+

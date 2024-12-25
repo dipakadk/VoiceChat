@@ -126,8 +126,8 @@ async def create_store(
                 try:
                     contents = await uploaded_file.read()
                     # Upload file to S3
-                    with io.BytesIO(contents) as file_content:
-                        s3.upload_fileobj(file_content, BUCKET_NAME, unique_filename)
+                    # with io.BytesIO(contents) as file_content:
+                    #     s3.upload_fileobj(file_content, BUCKET_NAME, unique_filename)
                     s3_url = f"https://{BUCKET_NAME}.s3.amazonaws.com/{unique_filename}"
 
                     # Save file temporarily for processing
@@ -545,9 +545,11 @@ async def generate_compilation(request: Request,background_tasks: BackgroundTask
 
         }
         generate_response_instance = GenerateResponse(**data)
-        result, handled, user_intent= await generate_response_instance.generate()
-        send_result=result.get("result",'')
-        return StreamingResponse(generate_streaming_response(stream,send_result,call_id), media_type="text/event-stream")
+        # result, handled, user_intent= await generate_response_instance.generate()
+
+        await generate_response_instance.generate()
+        # send_result=result.get("result",'')
+        # return StreamingResponse(generate_streaming_response(stream,send_result,call_id), media_type="text/event-stream")
 
 
     except HTTPException as e:
@@ -817,6 +819,8 @@ async def get_response(request: QueryRequest,background_tasks: BackgroundTasks):
                 }
 
         }
+        
+
         generate_response_instance = GenerateResponse(**data)
         if request.stream in [True, "True", "true"]:
             return StreamingResponse(generate_response_instance.generate_streaming_response(), media_type="text/event-stream")

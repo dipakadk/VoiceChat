@@ -67,3 +67,5 @@ async def checkTime(self):
         chain = prompt | self.llm | StrOutputParser()
         return await chain.ainvoke({"query": query, "available": time_slots, "Today": formatted_date, "Time":formatted_time, "Day":formatted_day})
     return check_available_timeslot
+
+
