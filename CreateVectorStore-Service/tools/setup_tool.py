@@ -81,7 +81,7 @@ class GetCustomTools():
     async def create(cls, params=None):
         self = cls(params)
         loop = asyncio.get_event_loop()
-        executor = ThreadPoolExecutor(max_workers=1)
+        executor = ThreadPoolExecutor(max_workers=2)
         await asyncio.get_event_loop().run_in_executor(
             executor, asyncio.run, self._initialize_tools_threadsafe()
         )

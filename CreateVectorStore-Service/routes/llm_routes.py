@@ -1,4 +1,5 @@
-from fastapi import APIRouter,UploadFile, File,HTTPException, Request,BackgroundTasks,Query
+from fastapi import  APIRouter,UploadFile, File,HTTPException, Request,BackgroundTasks,Query
+router = APIRouter()
 from typing import List,Optional
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.document_loaders import PyMuPDFLoader,TextLoader
@@ -8,6 +9,7 @@ from fastapi.responses import StreamingResponse
 from datetime import datetime,timedelta, timezone
 import uuid
 import io
+import base64, asyncio
 import boto3
 from openai import OpenAI
 import os
@@ -34,8 +36,13 @@ from services.whatsappService import searchVisitorBySender, findInitialMessage
 from services.FacebookInstagramService import get_initial_case_facebookInstagram
 
 load_dotenv()
-router = APIRouter()
 
+
+
+from fastapi.websockets import WebSocket
+
+
+from tools import *   
 
 
 MILVUS_HOST= os.getenv('MILVUS_HOST') 
@@ -56,7 +63,7 @@ BUCKET_NAME=os.getenv('BUCKET_NAME')
 AWS_ACCESS_KEY_ID=os.getenv('AWS_ACCESS_KEY_ID')
 AWS_SECRET_ACCESS_KEY=os.getenv('AWS_SECRET_ACCESS_KEY')
 DB_NAME=os.getenv('DB_NAME') or 'General'
-
+import time
 
 client = OpenAI(api_key=OPEN_API_KEY)
 embedding_type="openai"
@@ -358,6 +365,10 @@ from openai import OpenAI
 import json
 client = OpenAI(api_key=OPEN_API_KEY)
 
+
+
+
+
 def generate_streaming_response(data,result,call_id):
     print(result,"result datat")
     message_id=f'chatcmpl-{call_id}'
@@ -388,6 +399,13 @@ def generate_streaming_response(data,result,call_id):
 
         yield f"data:{json_data}\n\n"
 
+
+
+LOG_EVENT_TYPES = [
+            'error', 'response.content.done', 'rate_limits.updated', 'response.done',
+            'input_audio_buffer.committed', 'input_audio_buffer.speech_stopped',
+            'input_audio_buffer.speech_started', 'session.created'
+        ]
 
 
 
@@ -565,31 +583,45 @@ async def generate_compilation(request: Request,background_tasks: BackgroundTask
 
 from main import *
 
-@router.get("/make_call")
-async def make_call():
-    """Make an outbound call."""
-    outbound_twiml = (
-        f'<?xml version="1.0" encoding="UTF-8"?>'
-        f'<Response><Connect><Stream url="wss://5b89-111-119-49-191.ngrok-free.app/llm/media-stream" /></Connect></Response>'
-    )
+from pydantic import BaseModel
 
-    call = client.calls.create(
-        from_=PHONE_NUMBER_FROM,
-        to="+9779844484829",
-        twiml=outbound_twiml
-    )
-    loop_twilio = asyncio.new_event_loop()
-    asyncio.set_event_loop(loop_twilio)
-    # call_number = "+9779844484829"
-    # await loop_twilio.run_until_complete(log_call_sid(call.sid))
-    await loop_twilio.run_until_complete(log_call_sid(call.sid))
+class CallRequest(BaseModel):
+    phone_number: str
+    chatbot_name:Optional[str]
+    details:dict
+    clientId:Optional[str]
+    locationId:Optional[str]
+    chatbotName:Optional[str]
+    orgName:Optional[str]
+    
 
-    
-    
+# @router.post('/make-call')
+# async def trigger_call(request: CallRequest):
+#     """
+#     Trigger a call to the provided phone number using Twilio.
+#     """
+#     phone_number = request.phone_number
+
+#     if not phone_number:
+#         raise HTTPException(status_code=400, detail="Phone number is required.")
+
+#     try:
+#         await make_call(request.phone_number)
+#         # await make_call(phone_number)
+#         return {"status": "success", "message": f"Call initiated to {phone_number}"}
+#     except Exception as e:
+#         raise HTTPException(status_code=500, detail=f"Error initiating call: {str(e)}")
+ 
+
+
+import websockets
+from fastapi.websockets import WebSocketDisconnect
 
 @router.post("/generate/response/chat/completions")
 async def get_response(request: QueryRequest,background_tasks: BackgroundTasks):
     global vector_database
+    global phoneServiceInstance
+
     
     isVisitor_new=True
     # email= None
@@ -910,7 +942,8 @@ async def get_response(request: QueryRequest,background_tasks: BackgroundTasks):
         sorrymessage="I'm sorry, I don’t have all the details to fully answer your question right now."
         return {"result":sorrymessage,'sender':sender}
 
-
+from callservice import *
+from chains.prompt import SYSTEM_PROMPT, tools_functions
 
                 
 @router.websocket('/media-stream')
@@ -922,7 +955,7 @@ async def handle_media_stream(websocket: WebSocket):
     async with websockets.connect(
         'wss://api.openai.com/v1/realtime?model=gpt-4o-realtime-preview-2024-12-17',
         extra_headers={
-            "Authorization": f"Bearer {OPENAI_API_KEY}",
+            "Authorization": f"Bearer {OPEN_API_KEY}",
             "OpenAI-Beta": "realtime=v1"
         }
     ) as openai_ws:
@@ -943,6 +976,8 @@ async def handle_media_stream(websocket: WebSocket):
                         await openai_ws.send(json.dumps(audio_append))
                     elif data['event'] == 'start':
                         stream_sid = data['start']['streamSid']
+                        call_sid = data['start']['callSid']
+                        print(call_sid)
                         print(f"Incoming stream has started {stream_sid}")
             except WebSocketDisconnect:
                 print("Client disconnected.")
@@ -978,13 +1013,12 @@ async def handle_media_stream(websocket: WebSocket):
                         print("***********************************function is called*******************")
                         print()
                         functions = {
-                            'date_booking': checkTime,
-                            'bookTool':booking_user_form_tool ,
-                            'generalInfo':general_info,
-                            'CancelBookTool':CancelBooking,
-                            'RescheduleTourBook':RescheduleBooking,
+                                    # "generalInfo": general_info,
+                                    # "check_details": check_details,
+                                    # "bookTool": booking_user_form_tool,
+                                    # "checkTime": checkTime
+                                    }
 
-                        }
                         try:
                             function_name = response['name']
                             print("=====================================>",function_name)
@@ -1017,6 +1051,7 @@ async def handle_media_stream(websocket: WebSocket):
                 print(f"Error in send_to_twilio: {e}")
         await asyncio.gather(receive_from_twilio(), send_to_twilio())
     
+
 
 
 # API endpoint to detaermine top asked questions and intents

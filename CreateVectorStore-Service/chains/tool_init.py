@@ -9,55 +9,64 @@ from utils.agent_variables import gdpr_instruction_gated, gdpr_instruction_trans
 from utils.redis_whatsapp import getData
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
-
-
-
-import os
-import json
-import base64
-import asyncio
-import argparse
-import time
-from fastapi import FastAPI, WebSocket
-from fastapi.responses import JSONResponse
-from fastapi.websockets import WebSocketDisconnect
-from twilio.rest import Client
-import websockets
-from dotenv import load_dotenv
-import uvicorn
 from tools.setup_tool import *
 from datetime import datetime
-
-
-
-
 import html2text
 from langchain.schema.output_parser import StrOutputParser
 output_parser = StrOutputParser()
-
 #tools
 from tools.setup_tool import GetCustomTools
 from tools.intentChain import get_intent
 #utils
 from utils.get_prompts import get_prompts
 
-import pytz
-
-from chains.prompt import system_prompt
 
 
 
+
+
+
+def get_tool_func(tools):
+    tools_final =[]
+    functions = [convert_to_openai_function(t) for t in tools]
+    for functi in functions:
+        dict_1 = {'type': 'function'}
+        dict_1.update(functi)
+        tools_final.append(dict_1)
+    return tools_final
+
+
+
+import re
+import os
+import json
+import time
+import base64
+import asyncio
+import argparse
+from twilio.rest import Client
+from datetime import datetime,timezone
+from fastapi import FastAPI, WebSocket
+from langchain_openai import ChatOpenAI
+from dotenv import load_dotenv, find_dotenv
+
+from langchain.schema.output_parser import StrOutputParser
+today_date = datetime.now()
+day_of_week = today_date.strftime("%A")
+date = today_date.strftime("Year: %Y, Month: %m, Day: %d, %H:%M %p")
+
+load_dotenv(find_dotenv())
+
+from chains.prompt import phoneServiceInstance
 
 
 async def init_tool(request_data):
-    global system_prompt 
-    
+    global phoneServiceInstance
     time1=datetime.now()
    
     # prompt_agent = ChatPromptTemplate.from_messages(get_prompts(None,'agent_template',False,request_data.org_name,request_data.chatbot_name))
     # if request_data.agent=="outboundCall":
     #     prompt_agent = ChatPromptTemplate.from_messages(get_prompts(None,'outboundCall_template',False,request_data.org_name,request_data.chatbot_name))
-
     if request_data.query in ["/dummy_welcome"]:
         request_data.history.clear()
     
@@ -67,11 +76,16 @@ async def init_tool(request_data):
     print("Total initialization", time_after-time_before)
     tools=await toolsInstance.get_tools()
     tool_names=await toolsInstance.get_tools_names()
-    
-
+    print(tools)
+    print()
+    print()
+    print()
     print("History Sender is ==================",request_data.history_sender_branch)
     print("Booked Flag value is ==============================",request_data.flagBooked)
 
+    print()
+    print()
+    print()
     if request_data.prompt not in [None, "", " ", "string", "<p><br></p>"]:
         
         markdown_converter = html2text.HTML2Text()
@@ -97,170 +111,22 @@ async def init_tool(request_data):
     else:
         prompt_agent = ChatPromptTemplate.from_messages(get_prompts(None,'agent_template_gated',False,request_data.org_name,request_data.chatbot_name,request_data))
     
-    # if request_data.stream in [True, "true", "True"]:
-    #     model = os.getenv("MODAL")
-    #     streaming_llm = get_streaming_llm(model=model)
-    #     agent = create_tool_calling_agent(streaming_llm,tools, prompt_agent)
-    #     system_prompt = prompt_agent
-    #     # agent_executor = AgentExecutor(tools = tools,
-    #     #                                 return_intermediate_steps= True, 
-    #     #                                 handle_parsing_errors=True,
-    #     #                                 max_iterations= 10, 
-    #     #                                 early_stopping_method ='generate',
-    #     #                                 agent= agent,
-    #     #                                 callbacks = [tool_handler],
-    #     #                                 verbose=True
-    #     #                                 )
-    # else:
-    #     # # print(request_data.llm)
-    #     # print("Before tool calling agent")
-    #     # agent = create_tool_calling_agent(request_data.llm,tools, prompt_agent)
-
-
-
-
-
-
-
-        
-    #     # agent_executor = AgentExecutor(tools = tools,
-    #     #                             return_intermediate_steps= True, 
-    #     #                             handle_parsing_errors=True,
-    #     #                             max_iterations= 10, 
-    #     #                             early_stopping_method ='generate',
-    #     #                             agent= agent,
-    #     #                             verbose=True
-    #                                 # )
-
-    #     print("After executor")
-    # # 
-    # print("\n\n========",request_data.summerize_history.load_memory_variables({}),"=============memory buffer")
-    system_prompt = prompt_agent
-
-
+    
     
 
-    # with get_openai_callback() as cb:
-    #         agent_with_chat_history = RunnableWithMessageHistory(
-    #                 agent_executor,
-    #                 lambda session_id: request_data.history,
-    #                 input_messages_key="query",
-    #                 history_messages_key="chat_history",
-    #                 verbose=True
-    #             )
-    #         config = {"configurable": {"session_id": request_data.history_sender}}
-    #         # print("History===========================",request_data.summerize_history)
-    #         intent_response = await get_intent(query=request_data.query, llm=request_data.llm, history=request_data.history)
-    #         request_data.requiredLanguage = intent_response.get("language")
-    #         important = intent_response.get("intent")
-    #         print("Intent is==========",important)
-    #         booking = ""
-    #         booking_2 = ""
-    #         lead_rules = ""
-
-    #         important_prompt = important_instructions if important in ["yes", "Yes"] else ""
-
-    #         gdpr_status = request_data.gdpr  
-    #         request_type = request_data.type
-
-    #         if request_data.agent not in ["OutboundPhoneCall"]:
-    #             if request_type == "gated":
-    #                 instruction =  no_gdpr_instruction_gated if gdpr_status in ["false"] else gdpr_instruction_gated
-    #             else:
-    #                 instruction =  no_gdpr_instruction_transparent if gdpr_status in ["false"] else gdpr_instruction_transparent
-    #         else:
-    #             instruction = ""
-                
-    #         if important not in ["yes", "Yes"]:
-    #             if request_data.branch:
-    #                 if not request_data.flagBooked:
-    #                     if gdpr_status not in ["false"]:
-    #                         booking = tour_booking_instructions
-    #                         booking_2 = booking_instructions_rules_important
-    #                         lead_rules = lead_instructions_rule
-    #                     else:
-    #                         booking = ""  
-    #                         booking_2 = ""
-    #                 else:
-    #                     if gdpr_status not in ["false"]:
-    #                         booking = reschedule_cancel_booking_instructions
-    #                         booking_2 = reschedule_instructions_rules_important
-    #                     else:
-    #                         booking = ""  
-    #                         booking_2 = ""
-    #             else:
-    #                 booking = location_instructions_rules
-    #                 booking_2 = ""
-    #         else:
-    #             if not request_data.flagBooked:
-    #                 booking = ""
-    #                 booking_2 = ""
-    #                 lead_rules = lead_instructions_rule
-                 
-
-    #         tz = timezone.utc
-    #         if request_data.client_details.get("timezone"):
-    #             try:
-    #                 tz = pytz.timezone(request_data.client_details.get("timezone"))
-    #             except Exception as e:
-    #                 tz = timezone.utc
-            
-    #         current_utc = datetime.now(tz)
-    #         formatted_date = current_utc.strftime("%A, %B %d, %Y")
-    #         formatted_time = current_utc.strftime("%H:%M:%S")
-    #         formatted_day = current_utc.strftime("%A")
     
-    #         if request_data.stream in ["True", True, "true"]:
-    #             for chunk in agent_with_chat_history.stream(
-    #                 {
-    #                 'query':request_data.query,
-    #                 'tool_names':tool_names,
-    #                 "metadata":request_data.metadata,
-    #                 "details":request_data.client_details,
-    #                 "chatbot_name":request_data.chatbot_name,
-    #                 "org_name":request_data.org_name,
-    #                 "booking_tour_fields":request_data.booking_tour_fields,
-    #                 "gated_or_transparent_instructions": instruction ,
-    #                 "branch_name":request_data.client_details.get("branch_name") or None,
-    #                 "branch_address":request_data.client_details.get("branch_address") or None,
-    #                 "booking_instructions":booking,
-    #                 "booking_instructions_2":booking_2,
-    #                 "Time": formatted_time,
-    #                 "Today": formatted_date,
-    #             "Day": formatted_day,
-    #                "important": important_prompt,
-    #                "lead_rules": lead_rules,
-    #                "flagBooked": request_data.flagBooked
-    #                 },config=config):
-    #                     pass
-    #         else:
-    #             generated_response = await agent_with_chat_history.ainvoke(
-    #             {
-    #                 'query':request_data.query,
-    #                'tool_names':tool_names,
-    #                "metadata":request_data.metadata,
-    #                "details":request_data.client_details,
-    #                "chatbot_name":request_data.chatbot_name,
-    #                "org_name":request_data.org_name,
-    #                "booking_tour_fields":request_data.booking_tour_fields,
-    #                "gated_or_transparent_instructions": instruction ,
-    #                "branch_name":request_data.client_details.get("branch_name") or None,
-    #                "branch_address":request_data.client_details.get("branch_address") or None,
-    #                "booking_instructions":booking,
-    #                "booking_instructions_2":booking_2,
-    #                "Time": formatted_time,
-    #             "Today": formatted_date,
-    #             "today": formatted_date,
-    #             "bookedFlag": request_data.flagBooked or None,
-    #             "Day": formatted_day,
-    #                "important": important_prompt,
-    #                "lead_rules": lead_rules,
-    #                 "flagBooked": request_data.flagBooked or None
-    #              },config=config)
-    #             resp = generated_response.get('output')
-    #             time2= datetime.now()
-    #             diff_time=time2-time1
-    #             if  request_data.WantsLocation:
-    #                  return {"result":resp,'sender':request_data.actual_sender,'response_time':diff_time, "query": request_data.query, "branchSelection": True}, request_data.unhandled_arguments, request_data.user_intent,request_data.sessionExists, request_data.tourBooked
-    #             return {"result":resp,'sender':request_data.actual_sender,'response_time':diff_time, "Tool Used?":request_data.toolinvoked, "Language Required": request_data.requiredLanguage}, request_data.unhandled_arguments, request_data.user_intent, request_data.sessionExists, request_data.tourBooked
-            
+    final_tools_array = get_tool_func(tools)
+    
+    phone = "+9779869035670"
+    
+    
+    from callservice import AIPhoneService
+    phoneServiceInstance = AIPhoneService(system_message=prompt_agent, tools=final_tools_array, phone_number_to_call=phone)
+
+    await phoneServiceInstance.make_call()
+    
+    
+
+
+
+
