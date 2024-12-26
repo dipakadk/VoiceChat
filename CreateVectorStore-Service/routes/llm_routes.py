@@ -14,24 +14,14 @@ import os
 from dotenv import load_dotenv
 from langchain.schema import Document
 from bson import ObjectId
-from store.vectorestore_connection import VectorStore
-from store.get_embedings_llm import Embedings
-from models.schema import QueryRequest, TrainingDataRequest
-from controllers.generate_response import GenerateResponse
-from store.database.milvus import MilvusVectoreStore
+
 from utils.utils import  validate_url,JSONEncoder
-from services.visitor_create_db import get_active_session,upsert_visitor,create_message,get_visitor_details,get_queries,create_visitors_session
-from db.db_config import vectorstore_info_collection, messages_collection
-from db.vector_store import VectorStoreInfoModel,FileMetadataModel
-from db.visitors import Visitor
-from services.web_extract_content import web_extractor
-from tools.get_top_queries_intents import cout_and_classify
 import json
 import pandas as pd
 import tempfile
-from services.http_api import process_search_response
-from services.whatsappService import searchVisitorBySender, findInitialMessage
-from services.FacebookInstagramService import get_initial_case_facebookInstagram
+
+
+from pydantic import BaseModel
 
 load_dotenv()
 router = APIRouter()
@@ -61,9 +51,9 @@ DB_NAME=os.getenv('DB_NAME') or 'General'
 client = OpenAI(api_key=OPEN_API_KEY)
 embedding_type="openai"
 vector_database={}
-EmbeddingIns = Embedings(embedding_type=embedding_type)
-embedings = EmbeddingIns.get_embedings()
-llm = EmbeddingIns.get_llm(0, MODAL)
+# EmbeddingIns = Embedings(embedding_type=embedding_type)
+# embedings = EmbeddingIns.get_embedings()
+# llm = EmbeddingIns.get_llm(0, MODAL)
 
 import websockets
 from fastapi import FastAPI, WebSocket
@@ -89,10 +79,20 @@ async def handle_media_stream(websocket: WebSocket):
         }
     ) as openai_ws:
         stream_sid = None
+        call_id  = None
+        locationId = None
+        clientId = None
+        senderId = None
+        ids: dict = {}
+
 
         async def receive_from_twilio():
             """Receive audio data from Twilio and send it to the OpenAI Realtime API."""
             nonlocal stream_sid
+            nonlocal locationId
+            nonlocal clientId
+            nonlocal senderId
+            nonlocal ids
             try:
                 async for message in websocket.iter_text():
                     data = json.loads(message)
@@ -105,8 +105,21 @@ async def handle_media_stream(websocket: WebSocket):
                     elif data['event'] == 'start':
                         stream_sid = data['start']['streamSid']
                         call_sid = data['start']['callSid']
+                        
                         prompt_dict = getData(call_sid)
+                        
                         prompt = prompt_dict['prompt'] 
+                        
+                        locationId = prompt_dict['locationId'] 
+                        clientId = prompt_dict['clientId'] 
+                        senderId = prompt_dict['senderId'] 
+                        
+                        ids = {
+                            "locationId":locationId,
+                            "clientId":clientId,
+                            "senderId":senderId,
+                        }
+                        
                         await initialize_session(openai_ws, prompt)
                         print(f"Incoming stream has started {stream_sid}")
             except WebSocketDisconnect:
@@ -117,6 +130,11 @@ async def handle_media_stream(websocket: WebSocket):
         async def send_to_twilio():
             """Receive events from the OpenAI Realtime API, send audio back to Twilio."""
             nonlocal stream_sid
+            nonlocal call_id
+            nonlocal locationId
+            nonlocal clientId
+            nonlocal senderId
+            
             try:
                 async for openai_message in openai_ws:
                     response = json.loads(openai_message)
@@ -142,6 +160,7 @@ async def handle_media_stream(websocket: WebSocket):
                         print()
                         print("***********************************function is called*******************")
                         print()
+                        call_id
                         functions = {
                                 "book_tool":book_tool,
                                 "general_keepme":general_keepme,
@@ -152,7 +171,9 @@ async def handle_media_stream(websocket: WebSocket):
                             function_name = response['name']
                             print("=====================================>",function_name)
                             call_id = response['call_id']
-                            arguments = json.loads(response['arguments'])
+                            
+                            response_arguments = response['arguements'] + ids
+                            arguments = json.loads(response_arguments)
                             if function_name in functions.keys():
                                 start_time = time.time()
                                 result = functions[function_name](arguments)
@@ -180,6 +201,7 @@ async def handle_media_stream(websocket: WebSocket):
                 print(f"Error in send_to_twilio: {e}")
         await asyncio.gather(receive_from_twilio(), send_to_twilio())
     
+
     
 class CallRequest(BaseModel):
     phone_number: str
@@ -188,6 +210,7 @@ class CallRequest(BaseModel):
     locationId:str
     chatbotName:str
     orgName:str
+    senderId:str
 
 
 
@@ -225,4 +248,9 @@ If you do not invoke the 'generalInfo' tool to answer for this query, it will vi
     prompt = system_prompt
 
     
-    await make_call(number=request.phone_number, prompt = prompt)
+    await make_call(number=request.phone_number, 
+                    prompt = prompt,
+                    clientId = request.clientId,
+                    locationId = request.locationId,
+                    senderId = request.senderId
+                    )

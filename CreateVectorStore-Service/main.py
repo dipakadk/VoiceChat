@@ -11,7 +11,7 @@ from twilio.rest import Client
 import websockets
 from dotenv import load_dotenv
 import uvicorn
-from tools.setup_tool import *
+
 from datetime import datetime
 
 
@@ -104,6 +104,7 @@ async def initialize_session(openai_ws, prompt):
     print()
     print()
     
+    
 
     session_update = {
         "type": "session.update",
@@ -123,11 +124,14 @@ async def initialize_session(openai_ws, prompt):
                         "type": "object",
                         "properties": {
                             "query": {"type": "string"},
-                            "name": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
                             "date": {"type": "string"},
                             "time": {"type": "string"},
+                            "email": {"type": "string"},
+                            "phone_number": {"type": "string"},
                             },
-                        "required": ["query", "name","date", "time", "email", "phone"]
+                        "required": ["query", "first_name", "last_name","date", "time", "email", "phone"]
                         },
                     "description": "A tool that is used to book a tour"
                     },
@@ -137,11 +141,13 @@ async def initialize_session(openai_ws, prompt):
                         "parameters": {
                             "type": "object",
                             "properties": {
-                                "query": {"type": "string"},
-                                "name": {"type": "string"},
-                                "date": {"type": "string"},
-                                "time": {"type": "string"},
-
+                            "query": {"type": "string"},
+                            "first_name": {"type": "string"},
+                            "last_name": {"type": "string"},
+                            "date": {"type": "string"},
+                            "time": {"type": "string"},
+                            "email": {"type": "string"},
+                            "phone_number": {"type": "string"},
                             },
                             "required": ["query", "name","date", "time", "email", "phone"]
                         },
@@ -170,7 +176,7 @@ async def initialize_session(openai_ws, prompt):
 
 
 
-async def make_call(number, prompt):
+async def make_call(number, prompt, clientId, locationId, senderId):
     """Make an outbound call."""
     outbound_twiml = (
         f'<?xml version="1.0" encoding="UTF-8"?>'
@@ -183,7 +189,11 @@ async def make_call(number, prompt):
         twiml=outbound_twiml
     )
     from utils.redis_whatsapp import setData
-    prompt_dict = {"prompt":prompt}
+    prompt_dict = {"prompt":prompt,
+                   "clientId":clientId,
+                   "locationId":locationId,
+                   "senderId":senderId
+                   }
     setData(call.sid, prompt_dict)
 
     await log_call_sid(call.sid)

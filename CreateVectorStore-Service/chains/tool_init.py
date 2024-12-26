@@ -57,12 +57,3 @@ import pytz
 
 
 
-
-
-async def init_tool(request_data):
-    
-    await make_call(number="+9779869035670")
-
-
-
-

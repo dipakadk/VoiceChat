@@ -124,16 +124,37 @@ def convert_date_format(query:str):
 from utils.redis_whatsapp import *
 def book_tool(data:dict):
     query = data.get('query', None)
-    name = data.get('name', None)
-    date = data.get('date', None)
+    first_name = data.get('name', None)
+    last_name = data.get('name', None)
+    Email = data.get('email', None)
+    Phonenumber = data.get('phone_number', None)
+    start_date = data.get('date', None)
     time = data.get('time', None)
+    end_date = f"{start_date} + 1 hour"
+    clientId = data.get('clientId', None)
+    locationId = data.get('branchId', None)
+    callId = data.get('branchId', None)
     
+    
+    params = {
+      "startDate": date,
+      "firstName": first_name,
+      "lastName": last_name,
+      "Email": Email,
+      "Phonenumber": Phonenumber,
+      "time": time,
+      "endDate": end_date,
+      "convertedDate": "convertedDate",
+      "clientId": clientId,
+      "branchId": locationId,
+      "sender": callId,
+    }
     # query, name= None, date= None, time= None
     if query is not None and date is not None and date is not None and time is not None:
         date_final = convert_date_format(query)
         sender_id = 'abc'
-        user_booking_data = {"name": name, "date": date_final, "time": time, "email": "ajeet@gmail.com", "phone": "9878909876"}
-        setData(sender_id, user_booking_data)
+       
+        setData(sender_id, params)
         return "Your booking has been confirmed"
     
     
