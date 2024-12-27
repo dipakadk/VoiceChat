@@ -176,12 +176,14 @@ async def initialize_session(openai_ws, prompt):
 
 
 
-async def make_call(number, prompt, clientId, locationId, senderId):
+async def make_call(number, prompt, clientId, locationId, senderId, first_name, last_name, Email, Phone):
     """Make an outbound call."""
     outbound_twiml = (
         f'<?xml version="1.0" encoding="UTF-8"?>'
-        f'<Response><Connect><Stream url="wss://b473-111-119-49-232.ngrok-free.app/llm/media-stream" /></Connect></Response>'
+        f'<Response><Connect><Stream url="wss://a467-111-119-49-232.ngrok-free.app/llm/media-stream" /></Connect></Response>'
     )
+    
+    
     
     call = client.calls.create(
         from_=PHONE_NUMBER_FROM,
@@ -192,7 +194,11 @@ async def make_call(number, prompt, clientId, locationId, senderId):
     prompt_dict = {"prompt":prompt,
                    "clientId":clientId,
                    "locationId":locationId,
-                   "senderId":senderId
+                   "senderId":senderId,
+                   "first_name":first_name,
+                   "last_name":last_name,
+                    "Email":Email,
+                    "Phone":Phone
                    }
     setData(call.sid, prompt_dict)
 

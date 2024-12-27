@@ -5,11 +5,6 @@ from dotenv import load_dotenv
 import csv
 from fastapi.responses import StreamingResponse
 from io import StringIO
-from utils.utils import  validate_url,JSONEncoder
-from services.visitor_create_db import get_chat_history,get_queries,query_group_pipeline,generate_visitor_pipeline,generate_lead_pipeline,upsert_visitor,create_visitors_session,upsert_session
-from db.db_config import vectorstore_info_collection,visitor_leads,messages_collection,visitor_collection
-from db.vector_store import VectorStoreInfoModel,VisitorLead
-from services.web_extract_content import get_all_bind_urls
 from bson import ObjectId
 import json
 from fastapi.concurrency import run_in_threadpool
@@ -23,14 +18,10 @@ from bs4 import BeautifulSoup
 from selenium.webdriver.common.by import By
 from selenium.webdriver.support.ui import WebDriverWait
 from selenium.webdriver.support import expected_conditions as EC
-from db.db_config import clients, branches
 from urllib.parse import urljoin, urlparse
-from services.backgroundService import create_visitor_lead
-from db.visitors import Message, LeadPostRequest, Visitor,Session_by_email_phone
 import os
 from dotenv import load_dotenv, find_dotenv
 load_dotenv(find_dotenv())
-from services.backgroundService import confirmation_service
 
 automation_url = os.getenv("AUTOMATION_URL")
 authorization_id = os.getenv("CREATE_CONFIRMATION_AUTHORIZATION_TOKEN")

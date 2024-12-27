@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from langchain.schema import Document
 from bson import ObjectId
 
-from utils.utils import  validate_url,JSONEncoder
+
 import json
 import pandas as pd
 import tempfile
@@ -61,7 +61,7 @@ from fastapi.responses import JSONResponse
 from fastapi.websockets import WebSocketDisconnect
 
 from main import *
-from chains.prompt import *
+from chains.tool_init import *
 
                 
 @router.websocket('/media-stream')
@@ -88,6 +88,7 @@ async def handle_media_stream(websocket: WebSocket):
 
         async def receive_from_twilio():
             """Receive audio data from Twilio and send it to the OpenAI Realtime API."""
+            nonlocal call_id
             nonlocal stream_sid
             nonlocal locationId
             nonlocal clientId
@@ -104,9 +105,9 @@ async def handle_media_stream(websocket: WebSocket):
                         await openai_ws.send(json.dumps(audio_append))
                     elif data['event'] == 'start':
                         stream_sid = data['start']['streamSid']
-                        call_sid = data['start']['callSid']
+                        call_id = data['start']['callSid']
                         
-                        prompt_dict = getData(call_sid)
+                        prompt_dict = getData(call_id)
                         
                         prompt = prompt_dict['prompt'] 
                         
@@ -160,7 +161,28 @@ async def handle_media_stream(websocket: WebSocket):
                         print()
                         print("***********************************function is called*******************")
                         print()
-                        call_id
+                        
+                        prompt_dict = getData(call_id)
+                        
+                        
+                        locationId = prompt_dict['locationId'] 
+                        clientId = prompt_dict['clientId'] 
+                        senderId = prompt_dict['senderId'] 
+                        
+                        first_name = prompt_dict['first_name'] 
+                        last_name = prompt_dict['last_name'] 
+                        Email = prompt_dict['Email'] 
+                        Phone = prompt_dict['Phone'] 
+                        
+                        ids = {
+                            "locationId":locationId,
+                            "clientId":clientId,
+                            "senderId":senderId,
+                            "first_name":first_name,
+                            "last_name":last_name,
+                            "Email":Email,
+                            "Phone":Phone
+                        }
                         functions = {
                                 "book_tool":book_tool,
                                 "general_keepme":general_keepme,
@@ -170,10 +192,21 @@ async def handle_media_stream(websocket: WebSocket):
                         try:
                             function_name = response['name']
                             print("=====================================>",function_name)
-                            call_id = response['call_id']
                             
-                            response_arguments = response['arguements'] + ids
-                            arguments = json.loads(response_arguments)
+                            print()
+                            print()
+                            print(response['arguments'])
+                            print()
+                            print()
+                            
+                            response_arguments = response['arguments']
+                            
+                            print()
+                            print()
+                            print(ids)
+                            print()
+                            print()
+                            arguments = json.loads(response_arguments) | ids
                             if function_name in functions.keys():
                                 start_time = time.time()
                                 result = functions[function_name](arguments)
@@ -246,11 +279,22 @@ If you do not invoke the 'generalInfo' tool to answer for this query, it will vi
     """
     
     prompt = system_prompt
+    details = json.loads(request.details)
+    first_name = details.get("first_name")
+    last_name = details.get("last_name")
+    Phone = details.get("Phone")
+    Email = details.get("Email")
+    
+    
 
     
     await make_call(number=request.phone_number, 
                     prompt = prompt,
                     clientId = request.clientId,
                     locationId = request.locationId,
-                    senderId = request.senderId
+                    senderId = request.senderId,
+                    first_name = first_name,
+                    last_name = last_name,
+                    Email = Email,
+                    Phone = Phone
                     )
